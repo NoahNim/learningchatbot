@@ -4,7 +4,7 @@ import { useState } from "react";
 
 export default function Home() {
   const [messages, setMessages] = useState([
-    {role: 'assistant', content: `Hi I'm the Meowtime support assistant, how can I help you?` }
+    {role: 'assistant', content: "" }
   ]);
   const [message, setMessage] = useState('');
 
@@ -18,9 +18,25 @@ export default function Home() {
         ...messages,
         {role: 'user', content: message }
       ])
-    });
-    const data = await response.json();
-    setMessages([...messages, {role: 'assistant', content: data?.message}])
+    }).then(async (res) => {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let result = ''
+
+      return reader.read().then(function processText({done, value}) {
+        if (done) {
+          return result
+        }
+        const text = decoder.decode( value || new Uint8Array(), {stream: true} )
+        setMessages((messages) => {
+          let lastMessage = messages[messages.length - 1]
+          let otherMessages = messages.slice(0, messages.length - 1)
+
+          return [...otherMessages, {...lastMessage, content: lastMessage.content + text}]
+        })
+        return reader.read().then(processText)
+      })
+    })
   }
 
   return (
@@ -40,16 +56,17 @@ export default function Home() {
           direction="column"
           spacing={2}
           flexGrow={1}
+          overflow="auto"
         >
         {
-          messages.map(( message, index ) => {
+          messages?.map(( message, index ) => {
             <Box
               key={index}
               display="flex"
-              justifyContent={message.role === 'assistant' ? "flex-start" : "flex-end"}
+              justifyContent={message?.role === 'assistant' ? "flex-start" : "flex-end"}
             >
               <Box
-                bgcolor={message.role === 'assistant' ? "primary.main" : "secondary.main"}
+                bgcolor={message?.role === 'assistant' ? "primary.main" : "secondary.main"}
                 color="white"
                 borderRadius={16}
                 p={2}
